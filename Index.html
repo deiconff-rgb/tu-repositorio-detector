@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detector Universal de Intros</title>
+<style>
+  body { font-family: sans-serif; background: #121212; color: #fff; padding: 20px; }
+  .container { max-width: 600px; margin: 0 auto; background: #1e1e1e; padding: 20px; border-radius: 8px; }
+  input, button { width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 5px; border: 1px solid #333; box-sizing: border-box; }
+  input { background: #2a2a2a; color: #fff; }
+  button { background: #007bff; color: #fff; font-weight: bold; cursor: pointer; border: none; }
+  button:disabled { opacity: .6; cursor: default; }
+  button.add-btn { background: #28a745; margin-bottom: 25px; }
+  button.small { background: #444; margin-bottom: 0; }
+  .url-group { display: flex; gap: 10px; }
+  .url-group button { width: auto; background: #dc3545; }
+  .hint { color: #888; font-size: 13px; margin: -8px 0 15px; }
+  a.link { color: #007bff; }
+  details { margin-bottom: 20px; }
+  summary { cursor: pointer; color: #aaa; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h2>🚀 Escáner de Series Automático</h2>
+
+  <details id="tokenBox">
+    <summary>🔑 Token de GitHub (se guarda solo en este navegador)</summary>
+    <input type="password" id="token" placeholder="github_pat_...">
+    <button type="button" class="small" id="saveToken">Guardar token</button>
+  </details>
+
+  <form id="scannerForm">
+    <label>Nombre de la Serie (Identificador único):</label>
+    <input type="text" id="serie_name" placeholder="Ej: aguila_roja, breaking_bad" required>
+
+    <label>URLs de los Episodios en MP4 (en orden de reproducción):</label>
+    <p class="hint">Se necesitan al menos 2 episodios: el detector encuentra la intro comparándolos entre sí.</p>
+    <div id="urls_container">
+      <div class="url-group"><input type="url" class="video_url" placeholder="https://ejemplo.com/ep1.mp4" required></div>
+      <div class="url-group"><input type="url" class="video_url" placeholder="https://ejemplo.com/ep2.mp4" required></div>
+    </div>
+
+    <button type="button" class="add-btn" id="addUrlBtn">➕ Añadir otro episodio</button>
+    <button type="submit" id="submitBtn">⚡ Iniciar Análisis en GitHub</button>
+  </form>
+  <a class="link" href="resultados.html">📋 Ver resultados guardados</a>
+</div>
+
+<script>
+  const REPO_OWNER = "deiconff-rgb";
+  const REPO_NAME  = "tu-repositorio-detector";
+  const BRANCH     = "main";
+
+  const tokenInput = document.getElementById('token');
+  tokenInput.value = localStorage.getItem('gh_token') || '';
+  if (!tokenInput.value) document.getElementById('tokenBox').open = true;
+
+  document.getElementById('saveToken').addEventListener('click', () => {
+    localStorage.setItem('gh_token', tokenInput.value.trim());
+    alert("Token guardado en este navegador.");
+  });
+
+  let episodeCount = 2;
+  document.getElementById('addUrlBtn').addEventListener('click', () => {
+    episodeCount++;
+    const div = document.createElement('div');
+    div.className = 'url-group';
+    div.innerHTML = `<input type="url" class="video_url" placeholder="https://ejemplo.com/ep${episodeCount}.mp4" required>
+                     <button type="button" onclick="this.parentElement.remove()">❌</button>`;
+    document.getElementById('urls_container').appendChild(div);
+  });
+
+  document.getElementById('scannerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    const textoOriginal = "⚡ Iniciar Análisis en GitHub";
+    const token = localStorage.getItem('gh_token');
+    if (!token) { alert("Primero guarda tu token de GitHub."); document.getElementById('tokenBox').open = true; return; }
+
+    const serie = document.getElementById('serie_name').value
+      .trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    const urls = Array.from(document.querySelectorAll('.video_url')).map(i => i.value.trim()).filter(Boolean);
+
+    if (!serie) { alert("Escribe un nombre de serie válido."); return; }
+    if (urls.length < 2) { alert("Añade al menos 2 episodios."); return; }
+
+    btn.disabled = true;
+    btn.innerText = "Enviando a GitHub Cloud...";
+    try {
+      const r = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/detector.yml/dispatches`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ref: BRANCH, inputs: { serie_name: serie, video_urls: JSON.stringify(urls) } })
+      });
+      if (r.status === 204) {
+        alert("¡Proceso lanzado! Los resultados aparecerán en resultados.html cuando termine el análisis (revisa la pestaña Actions del repo).");
+        window.location.href = "resultados.html";
+      } else {
+        let d = ""; try { d = (await r.json()).message || ""; } catch (_) {}
+        alert(`Error ${r.status} al conectar con GitHub. ${d}`);
+      }
+    } catch (err) {
+      alert("Error de red: " + err.message);
+    }
+    btn.disabled = false;
+    btn.innerText = textoOriginal;
+  });
+</script>
+</body>
+</html>
