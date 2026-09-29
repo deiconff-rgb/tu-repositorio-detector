@@ -9,15 +9,22 @@ on:
       video_urls:
         description: 'Arreglo JSON de URLs'
         required: true
-      webhook_url:
-        description: 'URL de tu API en KSWEB'
-        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: detector-json
+  cancel-in-progress: false
 
 jobs:
   analyze:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
+    - name: Descargar el repositorio
+      uses: actions/checkout@v4
+
     - name: Configurar Python
       uses: actions/setup-python@v5
       with:
@@ -33,53 +40,23 @@ jobs:
         pip install mkl requests
         pip install git+https://github.com/nielstenboom/recurring-content-detector.git@v1.1.1
 
-    - name: Descargar videos, detectar y enviar resultados
+    - name: Descargar, recortar y detectar
       env:
-        # Los inputs pasan como variables de entorno (nunca dentro del código),
-        # así una comilla rara en la entrada no puede ejecutar nada.
         SERIE_NAME: ${{ github.event.inputs.serie_name }}
         VIDEO_URLS: ${{ github.event.inputs.video_urls }}
-        WEBHOOK_URL: ${{ github.event.inputs.webhook_url }}
-        # Opcional: crea el secret DETECTOR_API_KEY en Settings > Secrets > Actions
-        # y pon la misma clave en api.php. Si no existe, llega vacío y no se usa.
-        API_KEY: ${{ secrets.DETECTOR_API_KEY }}
       run: |
         python - <<'PY'
         import os, sys, json, subprocess, shutil
         import requests
         import recurring_content_detector as rcd
 
+        INICIO_SEG = 600
+        FINAL_SEG = 480
+
         serie = os.environ["SERIE_NAME"]
         urls = json.loads(os.environ["VIDEO_URLS"])
-        webhook = os.environ["WEBHOOK_URL"]
-        api_key = os.environ.get("API_KEY", "")
-
         if len(urls) < 2:
             sys.exit("Se necesitan al menos 2 episodios para comparar.")
-
-        # 1) Descargar los videos con nombres ordenables: ep_001.mp4, ep_002.mp4...
-        #    La librería procesa una CARPETA y ordena los archivos alfabéticamente.
-        shutil.rmtree("videos", ignore_errors=True)
-        os.makedirs("videos")
-        nombres = []
-        for i, url in enumerate(urls, start=1):
-            nombre = f"ep_{i:03d}.mp4"
-            print(f"Descargando episodio {i}/{len(urls)}...", flush=True)
-            with requests.get(url, stream=True, timeout=60, headers={"User-Agent": "Mozilla/5.0"}) as r:
-                r.raise_for_status()
-                with open(os.path.join("videos", nombre), "wb") as f:
-                    for chunk in r.iter_content(chunk_size=1024 * 1024):
-                        f.write(chunk)
-            nombres.append(nombre)
-
-        # 2) Detectar contenido recurrente
-        print(f"Procesando la serie: {serie} con {len(nombres)} videos...", flush=True)
-        detecciones = rcd.detect("videos", framejump=3, min_detection_size_seconds=15)
-        # Por si las claves vienen como ruta completa
-        detecciones = {os.path.basename(k): v for k, v in detecciones.items()}
-
-        def a_segundos(x):
-            return float(x.total_seconds()) if hasattr(x, "total_seconds") else float(x)
 
         def duracion(ruta):
             salida = subprocess.check_output([
@@ -88,39 +65,102 @@ jobs:
             ])
             return float(salida.decode().strip())
 
-        # 3) Convertir detecciones en intro y créditos
-        payload = []
-        for i, nombre in enumerate(nombres, start=1):
-            dur = duracion(os.path.join("videos", nombre))
-            intervalos = [(a_segundos(s), a_segundos(e)) for s, e in detecciones.get(nombre, [])]
+        def ffmpeg(*args):
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", *args], check=True)
 
+        def a_segundos(x):
+            return float(x.total_seconds()) if hasattr(x, "total_seconds") else float(x)
+
+        for carpeta in ("completos", "inicio", "final"):
+            shutil.rmtree(carpeta, ignore_errors=True)
+            os.makedirs(carpeta)
+
+        nombres, duraciones, dur_final = [], {}, {}
+        for i, url in enumerate(urls, start=1):
+            nombre = f"ep_{i:03d}.mp4"
+            completo = os.path.join("completos", nombre)
+            print(f"Descargando episodio {i}/{len(urls)}...", flush=True)
+            with requests.get(url, stream=True, timeout=60, headers={"User-Agent": "Mozilla/5.0"}) as r:
+                r.raise_for_status()
+                with open(completo, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=1024 * 1024):
+                        f.write(chunk)
+
+            dur = duracion(completo)
+            duraciones[nombre] = dur
+            ffmpeg("-t", str(INICIO_SEG), "-i", completo, "-c", "copy", os.path.join("inicio", nombre))
+            if dur > FINAL_SEG:
+                ffmpeg("-sseof", f"-{FINAL_SEG}", "-i", completo, "-c", "copy", os.path.join("final", nombre))
+            else:
+                ffmpeg("-i", completo, "-c", "copy", os.path.join("final", nombre))
+            dur_final[nombre] = duracion(os.path.join("final", nombre))
+            os.remove(completo)
+            nombres.append(nombre)
+
+        def detectar(carpeta):
+            print(f"Analizando '{carpeta}' con {len(nombres)} videos...", flush=True)
+            r = rcd.detect(carpeta, min_detection_size_seconds=15)
+            return {os.path.basename(k): v for k, v in r.items()}
+
+        det_inicio = detectar("inicio")
+        det_final = detectar("final")
+
+        nuevos = []
+        for i, nombre in enumerate(nombres, start=1):
             intro_ini = intro_fin = cred_ini = 0
 
-            # Créditos: intervalo que termina casi al final del video y empieza en su segunda mitad
-            finales = [(s, e) for s, e in intervalos if s > dur * 0.5 and e >= dur - 20]
-            if finales:
-                cred_ini = int(min(s for s, _ in finales))
-
-            # Intro: el intervalo más largo de la parte inicial del video
-            # (la librería también puede marcar el "resumen del capítulo anterior";
-            #  por eso se elige el más largo y no simplemente el primero)
-            iniciales = [(s, e) for s, e in intervalos if s < dur * 0.4 and (s, e) not in finales]
-            if iniciales:
-                s, e = max(iniciales, key=lambda t: t[1] - t[0])
+            ints = [(a_segundos(s), a_segundos(e)) for s, e in det_inicio.get(nombre, [])]
+            if ints:
+                s, e = max(ints, key=lambda t: t[1] - t[0])
                 intro_ini, intro_fin = int(s), int(e)
 
-            print(f"Ep {i}: intro {intro_ini}-{intro_fin}s, créditos {cred_ini}s (duración {int(dur)}s)")
-            payload.append({
-                "episodio": i,
-                "intro_inicio": intro_ini,
-                "intro_fin": intro_fin,
-                "creditos_inicio": cred_ini,
-            })
+            largo_final = dur_final[nombre]
+            ints = [(a_segundos(s), a_segundos(e)) for s, e in det_final.get(nombre, [])]
+            ints = [t for t in ints if t[1] >= largo_final - 20]
+            if ints:
+                s, _ = max(ints, key=lambda t: t[1] - t[0])
+                cred_ini = int(duraciones[nombre] - largo_final + s)
 
-        # 4) Enviar resultados a tu API
-        headers = {"X-API-KEY": api_key} if api_key else {}
-        resp = requests.post(webhook, json={"serie_name": serie, "resultados": payload},
-                             headers=headers, timeout=30)
-        print(f"Respuesta de KSWEB: {resp.status_code} {resp.text[:200]}")
-        resp.raise_for_status()
+            print(f"Ep {i}: intro {intro_ini}-{intro_fin}s, creditos {cred_ini}s (duracion {int(duraciones[nombre])}s)")
+            nuevos.append({"episodio": i, "intro_inicio": intro_ini,
+                           "intro_fin": intro_fin, "creditos_inicio": cred_ini})
+
+        ruta_json = os.path.join("data", "tiempos_series.json")
+        os.makedirs("data", exist_ok=True)
+        base = {}
+        if os.path.exists(ruta_json):
+            try:
+                with open(ruta_json, encoding="utf-8") as f:
+                    base = json.load(f)
+            except ValueError:
+                base = {}
+        if not isinstance(base, dict):
+            base = {}
+
+        por_ep = {int(e["episodio"]): e for e in base.get(serie, [])}
+        for e in nuevos:
+            por_ep[e["episodio"]] = e
+        base[serie] = [por_ep[k] for k in sorted(por_ep)]
+
+        with open(ruta_json, "w", encoding="utf-8") as f:
+            json.dump(base, f, indent=2, ensure_ascii=False)
+        print("Resultados guardados en data/tiempos_series.json")
         PY
+
+    - name: Guardar resultados en el repositorio
+      env:
+        SERIE_NAME: ${{ github.event.inputs.serie_name }}
+      run: |
+        git config user.name "detector-bot"
+        git config user.email "detector-bot@users.noreply.github.com"
+        git add data/tiempos_series.json
+        if git diff --cached --quiet; then
+          echo "Sin cambios que guardar"
+          exit 0
+        fi
+        git commit -m "Resultados: ${SERIE_NAME}"
+        for intento in 1 2 3; do
+          git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME" && exit 0
+          sleep 5
+        done
+        exit 1
