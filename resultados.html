@@ -10,29 +10,45 @@
   .serie-block { background: #1e1e1e; padding: 20px; margin-bottom: 30px; border-radius: 8px; overflow-x: auto; }
   h2 { text-transform: uppercase; color: #007bff; border-bottom: 1px solid #333; padding-bottom: 5px; }
   table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-  th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
+  th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; white-space: nowrap; }
   th { background: #2a2a2a; }
   .btn-delete { background: #dc3545; color: #fff; padding: 6px 12px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; }
-  .btn-nav { display: inline-block; background: #007bff; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-bottom: 20px; font-weight: bold; }
+  .btn-nav { display: inline-block; background: #007bff; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 0 8px 20px 0; font-weight: bold; border: none; font-size: 16px; cursor: pointer; }
+  .btn-nav.gris { background: #444; }
   .muted { color: #888; }
+  a.link { color: #4da3ff; }
 </style>
 </head>
 <body>
 <div class="container">
   <a href="index.html" class="btn-nav">⬅️ Volver al Escáner</a>
+  <button class="btn-nav gris" id="refrescar">🔄 Actualizar</button>
   <h1>📋 Registros Guardados</h1>
-  <p class="muted">Tras lanzar un análisis, los resultados aparecen aquí cuando el workflow termina. Recarga la página.</p>
+  <p class="muted">Tras lanzar un análisis, los resultados aparecen aquí cuando el workflow termina (mira el avance en
+    <a class="link" id="actionsLink" href="#" target="_blank" rel="noopener">Actions</a>) y pulsas Actualizar.</p>
   <div id="contenido"><p class="muted">Cargando...</p></div>
 </div>
 
+<script src="config.js"></script>
 <script>
-  const REPO_OWNER = "deiconff-rgb";
-  const REPO_NAME  = "tu-repositorio-detector";
-  const BRANCH     = "main";
+  const { owner: REPO_OWNER, repo: REPO_NAME, branch: BRANCH } = CONFIG;
   const API = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/data/tiempos_series.json`;
+  document.getElementById('actionsLink').href = `https://github.com/${REPO_OWNER}/${REPO_NAME}/actions`;
+  document.getElementById('refrescar').addEventListener('click', cargar);
 
-  const token = localStorage.getItem('gh_token');
-  const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
+  // Pide a la API de GitHub. Si el token es inválido/revocado (401), reintenta sin token:
+  // así la lectura sigue funcionando en un repositorio público.
+  async function pedir(url, opciones = {}) {
+    const token = getToken();
+    const headers = { ...(opciones.headers || {}) };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    let r = await fetch(url, { ...opciones, headers, cache: 'no-store' });
+    if (r.status === 401 && token) {
+      delete headers['Authorization'];
+      r = await fetch(url, { ...opciones, headers, cache: 'no-store' });
+    }
+    return r;
+  }
 
   function fmt(seg) {
     seg = parseInt(seg) || 0;
@@ -44,21 +60,25 @@
 
   async function cargar() {
     const cont = document.getElementById('contenido');
-    cont.innerHTML = "";
+    cont.innerHTML = '<p class="muted">Cargando...</p>';
     let datos = {};
     try {
-      const r = await fetch(`${API}?ref=${BRANCH}&t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { ...authHeaders, 'Accept': 'application/vnd.github.raw+json' }
+      const r = await pedir(`${API}?ref=${BRANCH}&t=${Date.now()}`, {
+        headers: { 'Accept': 'application/vnd.github.raw+json' }
       });
       if (r.status === 404) { cont.innerHTML = '<p class="muted">No hay datos analizados aún.</p>'; return; }
       if (!r.ok) throw new Error("GitHub respondió " + r.status);
-      datos = await r.json();
+      datos = JSON.parse(await r.text());
     } catch (err) {
-      cont.innerHTML = `<p class="muted">No se pudo cargar: ${err.message}</p>`;
+      cont.innerHTML = "";
+      const p = document.createElement('p');
+      p.className = 'muted';
+      p.textContent = "No se pudo cargar: " + err.message;
+      cont.appendChild(p);
       return;
     }
 
+    cont.innerHTML = "";
     const series = Object.keys(datos);
     if (!series.length) { cont.innerHTML = '<p class="muted">No hay datos analizados aún.</p>'; return; }
 
@@ -97,12 +117,13 @@
   }
 
   async function borrar(serie, ep) {
+    const token = getToken();
     if (!token) { alert("Guarda tu token en la página principal para poder borrar."); return; }
     if (!confirm("¿Seguro que quieres borrar este episodio?")) return;
     try {
-      const r = await fetch(`${API}?ref=${BRANCH}`, {
+      const r = await fetch(`${API}?ref=${BRANCH}&t=${Date.now()}`, {
         cache: 'no-store',
-        headers: { ...authHeaders, 'Accept': 'application/vnd.github+json' }
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
       });
       if (!r.ok) throw new Error("No se pudo leer el archivo (" + r.status + ")");
       const info = await r.json();
@@ -114,10 +135,10 @@
       const nuevo = btoa(unescape(encodeURIComponent(JSON.stringify(datos, null, 2))));
       const put = await fetch(API, {
         method: 'PUT',
-        headers: { ...authHeaders, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: `Borrar ${serie} ep ${ep}`, content: nuevo, sha: info.sha, branch: BRANCH })
       });
-      if (!put.ok) throw new Error("No se pudo guardar (" + put.status + "). ¿El token tiene permiso Contents: Read and write?");
+      if (!put.ok) throw new Error("No se pudo guardar (" + put.status + "). Para borrar, el token necesita el permiso 'Contents: Read and write'.");
       cargar();
     } catch (err) {
       alert("Error: " + err.message);
