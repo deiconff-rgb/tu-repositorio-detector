@@ -24,6 +24,8 @@ jobs:
     steps:
     - name: Descargar el repositorio
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Configurar Python
       uses: actions/setup-python@v5
@@ -66,7 +68,7 @@ jobs:
             return float(salida.decode().strip())
 
         def ffmpeg(*args):
-            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", *args], check=True)
+            subprocess.run(["ffmpeg", "-nostdin", "-y", "-loglevel", "error", *args], check=True)
 
         def a_segundos(x):
             return float(x.total_seconds()) if hasattr(x, "total_seconds") else float(x)
