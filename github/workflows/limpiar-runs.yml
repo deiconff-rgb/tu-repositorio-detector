@@ -1,0 +1,36 @@
+name: Limpiar ejecuciones antiguas
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      dias:
+        description: 'Borrar ejecuciones con más de estos días (0 = borrar todas las terminadas)'
+        default: '3'
+        required: true
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  limpiar:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Borrar ejecuciones terminadas y antiguas
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        DIAS: ${{ github.event.inputs.dias || '3' }}
+      run: |
+        case "$DIAS" in (*[!0-9]*|'') echo "Valor de días inválido"; exit 1;; esac
+        CORTE=$(date -u -d "$DIAS days ago" +%Y-%m-%dT%H:%M:%SZ)
+        echo "Borrando ejecuciones terminadas anteriores a $CORTE"
+        gh api --paginate "repos/$REPO/actions/runs?per_page=100" \
+          --jq ".workflow_runs[] | select(.status == \"completed\" and .created_at < \"$CORTE\") | .id" \
+          | while read -r id; do
+              echo "Borrando ejecución $id"
+              gh api -X DELETE "repos/$REPO/actions/runs/$id" || true
+            done
+        echo "Listo"
