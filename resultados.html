@@ -8,7 +8,6 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>tailwind.config={theme:{extend:{fontFamily:{sans:["\"Plus Jakarta Sans\"","system-ui","sans-serif"]}}}}</script>
-<script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
 <style type="text/tailwindcss">
   @layer components {
     .card { @apply rounded-2xl bg-violet-950/40 p-4 shadow-xl ring-1 ring-white/20 backdrop-blur-xl sm:p-6; }
@@ -182,13 +181,19 @@
     }
   }
 
-  const borrarEpisodio = (serie, ep) => ejecutar(`Borrar ${serie} ep ${ep}`, '¿Borrar este episodio?', datos => {
-    datos[serie] = (datos[serie] || []).filter(e => parseInt(e.episodio) !== ep);
-    if (!datos[serie].length) delete datos[serie];
-    return datos;
-  });
-  const borrarSerie = serie => ejecutar(`Borrar serie ${serie}`, `¿Borrar todos los episodios de "${serie.replace(/_/g, ' ')}"?`, datos => { delete datos[serie]; return datos; });
-  const borrarTodo = () => ejecutar('Borrar todos los resultados', '¿Borrar todos los resultados de todas las series? No se puede deshacer.', () => ({}));
+  function borrarEpisodio(serie, ep) {
+    return ejecutar(`Borrar ${serie} ep ${ep}`, '¿Borrar este episodio?', datos => {
+      datos[serie] = (datos[serie] || []).filter(e => parseInt(e.episodio) !== ep);
+      if (!datos[serie].length) delete datos[serie];
+      return datos;
+    });
+  }
+  function borrarSerie(serie) {
+    return ejecutar(`Borrar serie ${serie}`, `¿Borrar todos los episodios de "${serie.replace(/_/g, ' ')}"?`, datos => { delete datos[serie]; return datos; });
+  }
+  function borrarTodo() {
+    return ejecutar('Borrar todos los resultados', '¿Borrar todos los resultados de todas las series? No se puede deshacer.', () => ({}));
+  }
 
   icons();
   cargar();
