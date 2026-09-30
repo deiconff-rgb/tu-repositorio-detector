@@ -2,46 +2,53 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Resultados guardados</title>
-<style>
-  body { font-family: sans-serif; background: #121212; color: #fff; padding: 20px; }
-  .container { max-width: 900px; margin: 0 auto; }
-  .serie-block { background: #1e1e1e; padding: 20px; margin-bottom: 30px; border-radius: 8px; overflow-x: auto; }
-  .serie-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; }
-  h2 { text-transform: uppercase; color: #007bff; margin: 10px 0; }
-  table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-  th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; white-space: nowrap; }
-  th { background: #2a2a2a; }
-  .btn-delete { background: #dc3545; color: #fff; padding: 6px 12px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; white-space: nowrap; }
-  .btn-nav { display: inline-block; background: #007bff; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 0 8px 12px 0; font-weight: bold; border: none; font-size: 16px; cursor: pointer; }
-  .btn-nav.gris { background: #444; }
-  .btn-nav.rojo { background: #dc3545; }
-  .btn-nav:disabled, .btn-delete:disabled { opacity: .6; cursor: default; }
-  .muted { color: #888; }
-  a.link { color: #4da3ff; }
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7c3aed">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{fontFamily:{sans:["\"Plus Jakarta Sans\"","system-ui","sans-serif"]}}}}</script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style type="text/tailwindcss">
+  @layer components {
+    .card { @apply rounded-2xl bg-violet-950/40 p-4 shadow-xl ring-1 ring-white/20 backdrop-blur-xl sm:p-6; }
+    .field { @apply h-12 w-full rounded-xl bg-white/10 px-4 text-base text-white placeholder-white/60 ring-1 ring-white/25 focus:outline-none focus:ring-2 focus:ring-white; }
+    .btn, .btn-ghost, .btn-danger { @apply inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-white shadow-lg ring-1 ring-white/20 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-60; }
+    .btn { @apply bg-violet-900 hover:bg-violet-950; }
+    .btn-ghost { @apply bg-white/10 hover:bg-white/20; }
+    .btn-danger { @apply bg-rose-700 hover:bg-rose-800; }
+    .btn-sm { @apply h-10 px-3; }
+    .title-grad { @apply bg-gradient-to-r from-white to-fuchsia-200 bg-clip-text text-transparent; }
+  }
 </style>
+<title>Resultados</title>
 </head>
-<body>
-<div class="container">
-  <a href="index.html" class="btn-nav">⬅️ Volver al Escáner</a>
-  <button class="btn-nav gris" id="refrescar">🔄 Actualizar</button>
-  <button class="btn-nav rojo" id="borrarTodo">🗑️ Borrar todo</button>
-  <h1>📋 Registros Guardados</h1>
-  <p class="muted">Tras lanzar un análisis, los resultados aparecen aquí cuando el workflow termina (mira el avance en
-    <a class="link" id="actionsLink" href="#" target="_blank" rel="noopener">Actions</a>) y pulsas Actualizar.</p>
-  <div id="contenido"><p class="muted">Cargando...</p></div>
-</div>
+<body class="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 bg-fixed font-sans text-white antialiased">
+<main class="mx-auto w-full max-w-4xl px-4 py-8 sm:py-14">
+  <header class="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <a href="index.html" class="btn-ghost btn-sm !px-0 w-10" aria-label="Volver"><i data-lucide="arrow-left" class="h-5 w-5"></i></a>
+      <h1 class="title-grad text-3xl font-bold tracking-tight">Resultados</h1>
+    </div>
+    <div class="flex gap-2">
+      <button type="button" id="refrescar" class="btn-ghost btn-sm" aria-label="Actualizar"><i data-lucide="refresh-cw" class="h-4 w-4"></i><span class="hidden sm:inline">Actualizar</span></button>
+      <button type="button" id="borrarTodo" class="btn-danger btn-sm"><i data-lucide="trash-2" class="h-4 w-4"></i>Borrar todo</button>
+    </div>
+  </header>
+  <div id="contenido" class="space-y-5"></div>
+</main>
 
 <script src="config.js"></script>
+<script src="ui.js"></script>
 <script>
   const { owner: REPO_OWNER, repo: REPO_NAME, branch: BRANCH } = CONFIG;
   const API = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/data/tiempos_series.json`;
-  document.getElementById('actionsLink').href = `https://github.com/${REPO_OWNER}/${REPO_NAME}/actions`;
+  const cont = document.getElementById('contenido');
+  const COLS = 'grid-cols-2 gap-x-3 gap-y-2 md:grid-cols-[1fr_1.3fr_1.3fr_1.3fr_auto] md:gap-4';
   document.getElementById('refrescar').addEventListener('click', cargar);
   document.getElementById('borrarTodo').addEventListener('click', borrarTodo);
 
-  // Lectura: si el token es inválido/revocado (401), reintenta sin token (sirve en repos públicos)
+  // Lectura: si el token es inválido o revocado (401), reintenta sin token (repositorio público)
   async function pedir(url, opciones = {}) {
     const token = getToken();
     const headers = { ...(opciones.headers || {}) };
@@ -54,147 +61,136 @@
     return r;
   }
 
-  // 0 = "no detectado", salvo en el inicio de la intro cuando la intro sí se detectó (empieza en 00:00)
+  // 0 significa "no detectado", salvo el inicio de la intro cuando la intro sí se detectó
   function fmt(seg, ceroValido = false) {
     seg = parseInt(seg) || 0;
-    if (seg <= 0 && !ceroValido) return "—";
-    const m = String(Math.floor(seg / 60)).padStart(2, '0');
-    const s = String(seg % 60).padStart(2, '0');
-    return `${m}:${s} (${seg}s)`;
+    if (seg <= 0 && !ceroValido) return '—';
+    return String(Math.floor(seg / 60)).padStart(2, '0') + ':' + String(seg % 60).padStart(2, '0') + ' (' + seg + ' s)';
+  }
+
+  function aviso(icono, texto, girar = false) {
+    cont.innerHTML = `<div class="card flex flex-col items-center gap-3 py-12 text-center text-violet-100"><i data-lucide="${icono}" class="h-10 w-10 ${girar ? 'animate-spin' : ''}"></i><p></p></div>`;
+    cont.querySelector('p').textContent = texto;
+    icons();
+  }
+
+  function celda(etiqueta, valor) {
+    const d = document.createElement('div');
+    d.innerHTML = '<span class="block text-xs text-violet-200 md:hidden"></span><span class="tabular-nums"></span>';
+    d.children[0].textContent = etiqueta;
+    d.children[1].textContent = valor;
+    return d;
+  }
+
+  function boton(clase, icono, texto, alClick) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = clase;
+    b.innerHTML = `<i data-lucide="${icono}" class="h-4 w-4"></i><span></span>`;
+    b.querySelector('span').textContent = texto;
+    b.addEventListener('click', alClick);
+    return b;
   }
 
   async function cargar() {
-    const cont = document.getElementById('contenido');
-    cont.innerHTML = '<p class="muted">Cargando...</p>';
+    aviso('loader-circle', 'Cargando', true);
     let datos = {};
     try {
-      const r = await pedir(`${API}?ref=${BRANCH}&t=${Date.now()}`, {
-        headers: { 'Accept': 'application/vnd.github.raw+json' }
-      });
-      if (r.status === 404) { cont.innerHTML = '<p class="muted">No hay datos analizados aún.</p>'; return; }
-      if (!r.ok) throw new Error("GitHub respondió " + r.status);
+      const r = await pedir(`${API}?ref=${BRANCH}&t=${Date.now()}`, { headers: { 'Accept': 'application/vnd.github.raw+json' } });
+      if (r.status === 404) return aviso('inbox', 'Sin resultados');
+      if (!r.ok) throw new Error('GitHub respondió ' + r.status);
       datos = JSON.parse(await r.text());
     } catch (err) {
-      cont.innerHTML = "";
-      const p = document.createElement('p');
-      p.className = 'muted';
-      p.textContent = "No se pudo cargar: " + err.message;
-      cont.appendChild(p);
-      return;
+      return aviso('circle-alert', 'No se pudo cargar: ' + err.message);
     }
 
-    cont.innerHTML = "";
     const series = Object.keys(datos);
-    if (!series.length) { cont.innerHTML = '<p class="muted">No hay datos analizados aún.</p>'; return; }
+    if (!series.length) return aviso('inbox', 'Sin resultados');
+    cont.innerHTML = '';
 
     for (const serie of series) {
-      const bloque = document.createElement('div');
-      bloque.className = 'serie-block';
+      const bloque = document.createElement('section');
+      bloque.className = 'card';
 
       const cab = document.createElement('div');
-      cab.className = 'serie-head';
+      cab.className = 'mb-4 flex items-center justify-between gap-3';
       const h = document.createElement('h2');
-      h.textContent = "🎬 Serie: " + serie.replace(/_/g, ' ');
-      const btnSerie = document.createElement('button');
-      btnSerie.className = 'btn-delete';
-      btnSerie.textContent = "🗑️ Borrar serie";
-      btnSerie.addEventListener('click', () => borrarSerie(serie));
-      cab.appendChild(h);
-      cab.appendChild(btnSerie);
+      h.className = 'truncate text-lg font-semibold capitalize';
+      h.textContent = serie.replace(/_/g, ' ');
+      cab.append(h, boton('btn-danger btn-sm shrink-0', 'trash-2', 'Borrar serie', () => borrarSerie(serie)));
       bloque.appendChild(cab);
 
-      const tabla = document.createElement('table');
-      tabla.innerHTML = "<thead><tr><th>Episodio</th><th>Inicio Intro</th><th>Fin Intro</th><th>Inicio Créditos</th><th>Acciones</th></tr></thead>";
-      const tbody = document.createElement('tbody');
+      const titulos = document.createElement('div');
+      titulos.className = 'hidden px-0 pb-2 text-xs font-medium text-violet-200 md:grid ' + COLS;
+      ['Episodio', 'Inicio de intro', 'Fin de intro', 'Inicio de créditos', ''].forEach(t => {
+        const s = document.createElement('span'); s.textContent = t; titulos.appendChild(s);
+      });
+      bloque.appendChild(titulos);
 
+      const lista = document.createElement('div');
+      lista.className = 'space-y-2 md:space-y-0';
       for (const ep of datos[serie]) {
-        const tr = document.createElement('tr');
-        const introDetectada = (parseInt(ep.intro_fin) || 0) > 0;
-        const celdas = [
-          "Episodio " + (parseInt(ep.episodio) || 0),
-          fmt(ep.intro_inicio, introDetectada),
-          fmt(ep.intro_fin),
-          fmt(ep.creditos_inicio)
-        ];
-        for (const texto of celdas) {
-          const td = document.createElement('td');
-          td.textContent = texto;
-          tr.appendChild(td);
-        }
-        const tdAcc = document.createElement('td');
-        const btn = document.createElement('button');
-        btn.className = 'btn-delete';
-        btn.textContent = "🗑️ Borrar";
-        btn.addEventListener('click', () => borrarEpisodio(serie, parseInt(ep.episodio)));
-        tdAcc.appendChild(btn);
-        tr.appendChild(tdAcc);
-        tbody.appendChild(tr);
+        const fila = document.createElement('div');
+        fila.className = 'grid items-center rounded-xl bg-black/15 p-3 md:rounded-none md:border-t md:border-white/10 md:bg-transparent md:px-0 ' + COLS;
+        const detectada = (parseInt(ep.intro_fin) || 0) > 0;
+        const num = celda('', 'Episodio ' + (parseInt(ep.episodio) || 0));
+        num.className = 'col-span-2 font-semibold md:col-span-1';
+        num.firstChild.remove();
+        const borrar = boton('btn-danger btn-sm col-span-2 w-full md:col-span-1 md:w-auto', 'trash-2', 'Borrar', () => borrarEpisodio(serie, parseInt(ep.episodio)));
+        fila.append(num, celda('Inicio de intro', fmt(ep.intro_inicio, detectada)), celda('Fin de intro', fmt(ep.intro_fin)),
+                    celda('Inicio de créditos', fmt(ep.creditos_inicio)), borrar);
+        lista.appendChild(fila);
       }
-      tabla.appendChild(tbody);
-      bloque.appendChild(tabla);
+      bloque.appendChild(lista);
       cont.appendChild(bloque);
     }
+    icons();
   }
 
-  // Lee el JSON actual, aplica la función "cambiar" y lo guarda en el repo (reintenta si hubo un cambio en medio)
+  // Lee el JSON actual, aplica el cambio y lo guarda en el repositorio (reintenta si cambió en medio)
   async function modificar(mensajeCommit, cambiar) {
     const token = getToken();
-    if (!token) { alert("Guarda tu token en la página principal para poder borrar."); return false; }
+    if (!token) { toast('Guarda tu token en la página principal para poder borrar.', 'error'); return false; }
     const cab = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' };
-
     for (let intento = 0; intento < 2; intento++) {
       const r = await fetch(`${API}?ref=${BRANCH}&t=${Date.now()}`, { cache: 'no-store', headers: cab });
-      if (r.status === 404) { alert("No hay datos que borrar."); return false; }
-      if (!r.ok) throw new Error("No se pudo leer el archivo (" + r.status + ")");
+      if (r.status === 404) { toast('No hay datos que borrar.', 'info'); return false; }
+      if (!r.ok) throw new Error('No se pudo leer el archivo (' + r.status + ')');
       const info = await r.json();
       const datos = JSON.parse(decodeURIComponent(escape(atob(info.content.replace(/\n/g, '')))));
-
-      const nuevos = cambiar(datos);
-      const contenido = btoa(unescape(encodeURIComponent(JSON.stringify(nuevos, null, 2))));
-
+      const contenido = btoa(unescape(encodeURIComponent(JSON.stringify(cambiar(datos), null, 2))));
       const put = await fetch(API, {
         method: 'PUT',
         headers: { ...cab, 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: mensajeCommit, content: contenido, sha: info.sha, branch: BRANCH })
       });
       if (put.ok) return true;
-      if (put.status === 409 || put.status === 422) continue;   // alguien cambió el archivo: reintenta
-      if (put.status === 401) throw new Error("El token es inválido o fue revocado. Guarda uno nuevo en la página principal.");
-      if (put.status === 403 || put.status === 404)
-        throw new Error("No se pudo guardar (" + put.status + "). El token necesita el permiso 'Contents: Read and write' sobre este repositorio.");
-      throw new Error("No se pudo guardar (" + put.status + ")");
+      if (put.status === 409 || put.status === 422) continue;
+      if (put.status === 401) throw new Error('El token es inválido o fue revocado.');
+      if (put.status === 403 || put.status === 404) throw new Error('El token necesita el permiso Contents: Read and write.');
+      throw new Error('No se pudo guardar (' + put.status + ')');
     }
-    throw new Error("El archivo cambió mientras se guardaba. Pulsa Actualizar e inténtalo de nuevo.");
+    throw new Error('El archivo cambió mientras se guardaba. Actualiza e inténtalo de nuevo.');
   }
 
-  async function ejecutar(mensaje, confirmacion, cambiar) {
-    if (!confirm(confirmacion)) return;
+  async function ejecutar(mensaje, pregunta, cambiar) {
+    if (!(await confirmar(pregunta, 'Borrar'))) return;
     try {
-      if (await modificar(mensaje, cambiar)) cargar();
+      if (await modificar(mensaje, cambiar)) { toast('Cambios guardados.', 'ok'); cargar(); }
     } catch (err) {
-      alert("Error: " + err.message);
+      toast(err.message, 'error');
     }
   }
 
-  function borrarEpisodio(serie, ep) {
-    ejecutar(`Borrar ${serie} ep ${ep}`, "¿Seguro que quieres borrar este episodio?", (datos) => {
-      datos[serie] = (datos[serie] || []).filter(e => parseInt(e.episodio) !== ep);
-      if (!datos[serie].length) delete datos[serie];
-      return datos;
-    });
-  }
+  const borrarEpisodio = (serie, ep) => ejecutar(`Borrar ${serie} ep ${ep}`, '¿Borrar este episodio?', datos => {
+    datos[serie] = (datos[serie] || []).filter(e => parseInt(e.episodio) !== ep);
+    if (!datos[serie].length) delete datos[serie];
+    return datos;
+  });
+  const borrarSerie = serie => ejecutar(`Borrar serie ${serie}`, `¿Borrar todos los episodios de "${serie.replace(/_/g, ' ')}"?`, datos => { delete datos[serie]; return datos; });
+  const borrarTodo = () => ejecutar('Borrar todos los resultados', '¿Borrar todos los resultados de todas las series? No se puede deshacer.', () => ({}));
 
-  function borrarSerie(serie) {
-    ejecutar(`Borrar serie ${serie}`, `¿Borrar TODOS los episodios de "${serie.replace(/_/g, ' ')}"?`, (datos) => {
-      delete datos[serie];
-      return datos;
-    });
-  }
-
-  function borrarTodo() {
-    ejecutar("Borrar todos los resultados", "¿Borrar TODOS los resultados de TODAS las series? Esta acción no se puede deshacer.", () => ({}));
-  }
-
+  icons();
   cargar();
 </script>
 </body>
