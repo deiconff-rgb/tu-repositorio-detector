@@ -2,111 +2,117 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Detector Universal de Intros</title>
-<style>
-  body { font-family: sans-serif; background: #121212; color: #fff; padding: 20px; }
-  .container { max-width: 600px; margin: 0 auto; background: #1e1e1e; padding: 20px; border-radius: 8px; }
-  input, button { width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 5px; border: 1px solid #333; box-sizing: border-box; font-size: 16px; }
-  input { background: #2a2a2a; color: #fff; }
-  button { background: #007bff; color: #fff; font-weight: bold; cursor: pointer; border: none; }
-  button:disabled { opacity: .6; cursor: default; }
-  button.add-btn { background: #28a745; margin-bottom: 25px; }
-  button.small { background: #444; margin-bottom: 0; }
-  .url-group { display: flex; gap: 10px; }
-  .url-group button { width: auto; background: #dc3545; }
-  .hint { color: #888; font-size: 13px; margin: -8px 0 15px; }
-  a.link { color: #4da3ff; display: inline-block; margin-right: 18px; margin-top: 5px; }
-  details { margin-bottom: 20px; }
-  summary { cursor: pointer; color: #aaa; margin-bottom: 10px; }
-  #tokenEstado { font-size: 13px; color: #888; margin-top: 8px; }
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7c3aed">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{fontFamily:{sans:["\"Plus Jakarta Sans\"","system-ui","sans-serif"]}}}}</script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+<style type="text/tailwindcss">
+  @layer components {
+    .card { @apply rounded-2xl bg-violet-950/40 p-4 shadow-xl ring-1 ring-white/20 backdrop-blur-xl sm:p-6; }
+    .field { @apply h-12 w-full rounded-xl bg-white/10 px-4 text-base text-white placeholder-white/60 ring-1 ring-white/25 focus:outline-none focus:ring-2 focus:ring-white; }
+    .btn, .btn-ghost, .btn-danger { @apply inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-white shadow-lg ring-1 ring-white/20 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-60; }
+    .btn { @apply bg-violet-900 hover:bg-violet-950; }
+    .btn-ghost { @apply bg-white/10 hover:bg-white/20; }
+    .btn-danger { @apply bg-rose-700 hover:bg-rose-800; }
+    .btn-sm { @apply h-10 px-3; }
+    .title-grad { @apply bg-gradient-to-r from-white to-fuchsia-200 bg-clip-text text-transparent; }
+  }
 </style>
+<title>Escáner</title>
 </head>
-<body>
-<div class="container">
-  <h2>🚀 Escáner de Series Automático</h2>
+<body class="min-h-screen bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 bg-fixed font-sans text-white antialiased">
+<main class="mx-auto w-full max-w-xl px-4 py-8 sm:py-14">
+  <header class="mb-6 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <span class="grid h-11 w-11 place-items-center rounded-xl bg-violet-900 ring-1 ring-white/20"><i data-lucide="scan-search" class="h-6 w-6"></i></span>
+      <h1 class="title-grad text-3xl font-bold tracking-tight">Escáner</h1>
+    </div>
+    <a href="resultados.html" class="btn-ghost btn-sm"><i data-lucide="list-checks" class="h-4 w-4"></i>Resultados</a>
+  </header>
 
-  <details id="tokenBox">
-    <summary>🔑 Token de GitHub (se guarda solo en este navegador)</summary>
-    <input type="password" id="token" placeholder="github_pat_..." autocomplete="off">
-    <button type="button" class="small" id="saveToken">Guardar y comprobar token</button>
-    <div id="tokenEstado"></div>
+  <details id="tokenBox" class="card group mb-4">
+    <summary class="flex cursor-pointer list-none items-center gap-3 font-semibold [&::-webkit-details-marker]:hidden">
+      <i data-lucide="key-round" class="h-5 w-5"></i>Token de GitHub
+      <i data-lucide="chevron-down" class="ml-auto h-5 w-5 transition group-open:rotate-180"></i>
+    </summary>
+    <div class="mt-4 space-y-3">
+      <input id="token" type="password" class="field" placeholder="github_pat_..." autocomplete="off" aria-label="Token de GitHub">
+      <button type="button" id="saveToken" class="btn-ghost w-full">Guardar y comprobar</button>
+      <p id="tokenEstado" class="text-sm text-violet-100" role="status"></p>
+    </div>
   </details>
 
-  <form id="scannerForm">
-    <label>Nombre de la Serie (Identificador único):</label>
-    <input type="text" id="serie_name" placeholder="Ej: aguila_roja, breaking_bad" required>
-
-    <label>URLs de los Episodios en MP4 (en orden de reproducción):</label>
-    <p class="hint">Se necesitan al menos 2 episodios: el detector encuentra la intro comparándolos entre sí.</p>
-    <div id="urls_container">
-      <div class="url-group"><input type="url" class="video_url" placeholder="https://ejemplo.com/ep1.mp4" required></div>
-      <div class="url-group"><input type="url" class="video_url" placeholder="https://ejemplo.com/ep2.mp4" required></div>
-    </div>
-
-    <button type="button" class="add-btn" id="addUrlBtn">➕ Añadir otro episodio</button>
-    <button type="submit" id="submitBtn">⚡ Iniciar Análisis en GitHub</button>
+  <form id="scannerForm" class="card space-y-3">
+    <input id="serie_name" class="field" placeholder="Nombre de la serie" aria-label="Nombre de la serie" required>
+    <div id="urls" class="space-y-3"></div>
+    <button type="button" id="addUrlBtn" class="btn-ghost w-full"><i data-lucide="plus" class="h-4 w-4"></i>Añadir episodio</button>
+    <button type="submit" id="submitBtn" class="btn w-full"><i data-lucide="play" class="h-4 w-4"></i><span>Iniciar análisis</span></button>
   </form>
-
-  <a class="link" href="resultados.html">📋 Ver resultados guardados</a>
-  <a class="link" id="actionsLink" href="#" target="_blank" rel="noopener">⏳ Ver progreso en GitHub</a>
-</div>
+</main>
 
 <script src="config.js"></script>
+<script src="ui.js"></script>
 <script>
   const { owner: REPO_OWNER, repo: REPO_NAME, branch: BRANCH } = CONFIG;
-  document.getElementById('actionsLink').href = `https://github.com/${REPO_OWNER}/${REPO_NAME}/actions`;
+  const $ = id => document.getElementById(id);
+  $('token').value = localStorage.getItem('gh_token') || '';
+  if (!getToken()) $('tokenBox').open = true;
 
-  const tokenInput = document.getElementById('token');
-  const tokenEstado = document.getElementById('tokenEstado');
-  tokenInput.value = localStorage.getItem('gh_token') || '';
-  if (!getToken()) document.getElementById('tokenBox').open = true;
+  function estado(texto, tipo) {
+    const el = $('tokenEstado');
+    el.textContent = texto;
+    el.className = 'text-sm ' + (tipo === 'ok' ? 'text-emerald-200' : tipo === 'error' ? 'text-rose-200' : 'text-violet-100');
+  }
 
-  // Guarda el token y comprueba que GitHub lo acepta y que llega al repositorio
-  document.getElementById('saveToken').addEventListener('click', async () => {
-    const t = tokenInput.value.trim();
-    if (!t) { tokenEstado.textContent = "Pega primero tu token."; return; }
+  $('saveToken').addEventListener('click', async () => {
+    const t = $('token').value.trim();
+    if (!t) { estado('Pega primero tu token.', 'error'); return; }
     localStorage.setItem('gh_token', t);
-    tokenEstado.textContent = "Comprobando...";
+    estado('Comprobando...');
     try {
       const r = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`, {
         headers: { 'Authorization': `Bearer ${t}`, 'Accept': 'application/vnd.github+json' }
       });
-      if (r.ok) tokenEstado.textContent = "✅ Token guardado y válido para este repositorio.";
-      else if (r.status === 401) tokenEstado.textContent = "❌ GitHub dice que el token es inválido o fue revocado. Genera uno nuevo.";
-      else if (r.status === 404) tokenEstado.textContent = "⚠️ Token guardado, pero no tiene acceso a este repositorio. Al crearlo, elige este repo en 'Repository access'.";
-      else tokenEstado.textContent = "⚠️ Token guardado, pero GitHub respondió " + r.status + ".";
+      if (r.ok) estado('Token guardado y válido para este repositorio.', 'ok');
+      else if (r.status === 401) estado('El token es inválido o fue revocado. Genera uno nuevo.', 'error');
+      else if (r.status === 404) estado('Token guardado, pero sin acceso a este repositorio.', 'error');
+      else estado('Token guardado. GitHub respondió ' + r.status + '.', 'error');
     } catch (err) {
-      tokenEstado.textContent = "Token guardado. No se pudo comprobar (red): " + err.message;
+      estado('Token guardado. No se pudo comprobar: ' + err.message, 'error');
     }
   });
 
-  let episodeCount = 2;
-  document.getElementById('addUrlBtn').addEventListener('click', () => {
-    episodeCount++;
-    const div = document.createElement('div');
-    div.className = 'url-group';
-    div.innerHTML = `<input type="url" class="video_url" placeholder="https://ejemplo.com/ep${episodeCount}.mp4" required>
-                     <button type="button" onclick="this.parentElement.remove()">❌</button>`;
-    document.getElementById('urls_container').appendChild(div);
-  });
+  let n = 0;
+  function addUrl() {
+    n++;
+    const row = document.createElement('div');
+    row.className = 'flex gap-3';
+    row.innerHTML = `<input type="url" class="field video_url" placeholder="https://ejemplo.com/ep${n}.mp4" aria-label="URL del episodio ${n}" required>` +
+      (n > 2 ? '<button type="button" class="btn-ghost w-12 shrink-0 !px-0" aria-label="Quitar episodio"><i data-lucide="x" class="h-4 w-4"></i></button>' : '');
+    const quitar = row.querySelector('button');
+    if (quitar) quitar.addEventListener('click', () => row.remove());
+    $('urls').appendChild(row);
+    icons();
+  }
+  addUrl(); addUrl();
+  $('addUrlBtn').addEventListener('click', addUrl);
 
-  document.getElementById('scannerForm').addEventListener('submit', async (e) => {
+  $('scannerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const btn = document.getElementById('submitBtn');
-    const textoOriginal = "⚡ Iniciar Análisis en GitHub";
+    const btn = $('submitBtn'), etiqueta = btn.querySelector('span');
     const token = getToken();
-    if (!token) { alert("Primero guarda tu token de GitHub."); document.getElementById('tokenBox').open = true; return; }
+    if (!token) { toast('Guarda primero tu token de GitHub.', 'error'); $('tokenBox').open = true; return; }
 
-    const serie = document.getElementById('serie_name').value
-      .trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    const serie = $('serie_name').value.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     const urls = Array.from(document.querySelectorAll('.video_url')).map(i => i.value.trim()).filter(Boolean);
-
-    if (!serie) { alert("Escribe un nombre de serie válido (letras, números o guion bajo)."); return; }
-    if (urls.length < 2) { alert("Añade al menos 2 episodios."); return; }
+    if (!serie) { toast('Escribe un nombre de serie válido.', 'error'); return; }
+    if (urls.length < 2) { toast('Añade al menos 2 episodios.', 'error'); return; }
 
     btn.disabled = true;
-    btn.innerText = "Enviando a GitHub Cloud...";
+    etiqueta.textContent = 'Enviando...';
     try {
       const r = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/workflows/detector.yml/dispatches`, {
         method: 'POST',
@@ -119,23 +125,26 @@
         body: JSON.stringify({ ref: BRANCH, inputs: { serie_name: serie, video_urls: JSON.stringify(urls) } })
       });
       if (r.status === 204) {
-        alert("¡Proceso lanzado! Puedes ver el avance en 'Ver progreso en GitHub'. Cuando termine, los tiempos aparecerán en 'Ver resultados guardados'.");
-        window.location.href = "resultados.html";
-      } else {
-        let d = ""; try { d = (await r.json()).message || ""; } catch (_) {}
-        let ayuda = "";
-        if (r.status === 401) ayuda = "\n\nEl token es inválido o fue revocado. Genera uno nuevo y guárdalo.";
-        else if (r.status === 403) ayuda = "\n\nEl token no tiene permiso 'Actions: Read and write' sobre este repositorio.";
-        else if (r.status === 404) ayuda = "\n\nRevisa que el token tenga acceso a este repo y que el archivo esté en .github/workflows/detector.yml en la rama " + BRANCH + ".";
-        else if (r.status === 422) ayuda = "\n\nGitHub no encontró el workflow o la rama '" + BRANCH + "'.";
-        alert(`Error ${r.status} al conectar con GitHub. ${d}${ayuda}`);
+        toast('Análisis iniciado. Los resultados aparecerán al terminar.', 'ok');
+        setTimeout(() => { window.location.href = 'resultados.html'; }, 1200);
+        return;
       }
+      let d = ''; try { d = (await r.json()).message || ''; } catch (_) {}
+      const ayuda = {
+        401: 'El token es inválido o fue revocado.',
+        403: 'El token no tiene el permiso Actions: Read and write.',
+        404: 'Revisa que el token tenga acceso al repositorio y que detector.yml esté en .github/workflows.',
+        422: 'GitHub no encontró el workflow o la rama ' + BRANCH + '.'
+      }[r.status] || '';
+      toast(`Error ${r.status}. ${ayuda} ${d}`.trim(), 'error');
     } catch (err) {
-      alert("Error de red: " + err.message);
+      toast('Error de red: ' + err.message, 'error');
     }
     btn.disabled = false;
-    btn.innerText = textoOriginal;
+    etiqueta.textContent = 'Iniciar análisis';
   });
+
+  icons();
 </script>
 </body>
 </html>
