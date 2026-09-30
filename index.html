@@ -7,7 +7,7 @@
 <style>
   body { font-family: sans-serif; background: #121212; color: #fff; padding: 20px; }
   .container { max-width: 600px; margin: 0 auto; background: #1e1e1e; padding: 20px; border-radius: 8px; }
-  input, button { width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 5px; border: 1px solid #333; box-sizing: border-box; }
+  input, button { width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 5px; border: 1px solid #333; box-sizing: border-box; font-size: 16px; }
   input { background: #2a2a2a; color: #fff; }
   button { background: #007bff; color: #fff; font-weight: bold; cursor: pointer; border: none; }
   button:disabled { opacity: .6; cursor: default; }
@@ -16,9 +16,10 @@
   .url-group { display: flex; gap: 10px; }
   .url-group button { width: auto; background: #dc3545; }
   .hint { color: #888; font-size: 13px; margin: -8px 0 15px; }
-  a.link { color: #007bff; }
+  a.link { color: #4da3ff; display: inline-block; margin-right: 18px; margin-top: 5px; }
   details { margin-bottom: 20px; }
   summary { cursor: pointer; color: #aaa; margin-bottom: 10px; }
+  #tokenEstado { font-size: 13px; color: #888; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -27,8 +28,9 @@
 
   <details id="tokenBox">
     <summary>🔑 Token de GitHub (se guarda solo en este navegador)</summary>
-    <input type="password" id="token" placeholder="github_pat_...">
-    <button type="button" class="small" id="saveToken">Guardar token</button>
+    <input type="password" id="token" placeholder="github_pat_..." autocomplete="off">
+    <button type="button" class="small" id="saveToken">Guardar y comprobar token</button>
+    <div id="tokenEstado"></div>
   </details>
 
   <form id="scannerForm">
@@ -45,21 +47,38 @@
     <button type="button" class="add-btn" id="addUrlBtn">➕ Añadir otro episodio</button>
     <button type="submit" id="submitBtn">⚡ Iniciar Análisis en GitHub</button>
   </form>
+
   <a class="link" href="resultados.html">📋 Ver resultados guardados</a>
+  <a class="link" id="actionsLink" href="#" target="_blank" rel="noopener">⏳ Ver progreso en GitHub</a>
 </div>
 
+<script src="config.js"></script>
 <script>
-  const REPO_OWNER = "deiconff-rgb";
-  const REPO_NAME  = "tu-repositorio-detector";
-  const BRANCH     = "main";
+  const { owner: REPO_OWNER, repo: REPO_NAME, branch: BRANCH } = CONFIG;
+  document.getElementById('actionsLink').href = `https://github.com/${REPO_OWNER}/${REPO_NAME}/actions`;
 
   const tokenInput = document.getElementById('token');
+  const tokenEstado = document.getElementById('tokenEstado');
   tokenInput.value = localStorage.getItem('gh_token') || '';
-  if (!tokenInput.value) document.getElementById('tokenBox').open = true;
+  if (!getToken()) document.getElementById('tokenBox').open = true;
 
-  document.getElementById('saveToken').addEventListener('click', () => {
-    localStorage.setItem('gh_token', tokenInput.value.trim());
-    alert("Token guardado en este navegador.");
+  // Guarda el token y comprueba que GitHub lo acepta y que llega al repositorio
+  document.getElementById('saveToken').addEventListener('click', async () => {
+    const t = tokenInput.value.trim();
+    if (!t) { tokenEstado.textContent = "Pega primero tu token."; return; }
+    localStorage.setItem('gh_token', t);
+    tokenEstado.textContent = "Comprobando...";
+    try {
+      const r = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`, {
+        headers: { 'Authorization': `Bearer ${t}`, 'Accept': 'application/vnd.github+json' }
+      });
+      if (r.ok) tokenEstado.textContent = "✅ Token guardado y válido para este repositorio.";
+      else if (r.status === 401) tokenEstado.textContent = "❌ GitHub dice que el token es inválido o fue revocado. Genera uno nuevo.";
+      else if (r.status === 404) tokenEstado.textContent = "⚠️ Token guardado, pero no tiene acceso a este repositorio. Al crearlo, elige este repo en 'Repository access'.";
+      else tokenEstado.textContent = "⚠️ Token guardado, pero GitHub respondió " + r.status + ".";
+    } catch (err) {
+      tokenEstado.textContent = "Token guardado. No se pudo comprobar (red): " + err.message;
+    }
   });
 
   let episodeCount = 2;
@@ -76,14 +95,14 @@
     e.preventDefault();
     const btn = document.getElementById('submitBtn');
     const textoOriginal = "⚡ Iniciar Análisis en GitHub";
-    const token = localStorage.getItem('gh_token');
+    const token = getToken();
     if (!token) { alert("Primero guarda tu token de GitHub."); document.getElementById('tokenBox').open = true; return; }
 
     const serie = document.getElementById('serie_name').value
       .trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     const urls = Array.from(document.querySelectorAll('.video_url')).map(i => i.value.trim()).filter(Boolean);
 
-    if (!serie) { alert("Escribe un nombre de serie válido."); return; }
+    if (!serie) { alert("Escribe un nombre de serie válido (letras, números o guion bajo)."); return; }
     if (urls.length < 2) { alert("Añade al menos 2 episodios."); return; }
 
     btn.disabled = true;
@@ -100,11 +119,16 @@
         body: JSON.stringify({ ref: BRANCH, inputs: { serie_name: serie, video_urls: JSON.stringify(urls) } })
       });
       if (r.status === 204) {
-        alert("¡Proceso lanzado! Los resultados aparecerán en resultados.html cuando termine el análisis (revisa la pestaña Actions del repo).");
+        alert("¡Proceso lanzado! Puedes ver el avance en 'Ver progreso en GitHub'. Cuando termine, los tiempos aparecerán en 'Ver resultados guardados'.");
         window.location.href = "resultados.html";
       } else {
         let d = ""; try { d = (await r.json()).message || ""; } catch (_) {}
-        alert(`Error ${r.status} al conectar con GitHub. ${d}`);
+        let ayuda = "";
+        if (r.status === 401) ayuda = "\n\nEl token es inválido o fue revocado. Genera uno nuevo y guárdalo.";
+        else if (r.status === 403) ayuda = "\n\nEl token no tiene permiso 'Actions: Read and write' sobre este repositorio.";
+        else if (r.status === 404) ayuda = "\n\nRevisa que el token tenga acceso a este repo y que el archivo esté en .github/workflows/detector.yml en la rama " + BRANCH + ".";
+        else if (r.status === 422) ayuda = "\n\nGitHub no encontró el workflow o la rama '" + BRANCH + "'.";
+        alert(`Error ${r.status} al conectar con GitHub. ${d}${ayuda}`);
       }
     } catch (err) {
       alert("Error de red: " + err.message);
