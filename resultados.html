@@ -8,13 +8,16 @@
   body { font-family: sans-serif; background: #121212; color: #fff; padding: 20px; }
   .container { max-width: 900px; margin: 0 auto; }
   .serie-block { background: #1e1e1e; padding: 20px; margin-bottom: 30px; border-radius: 8px; overflow-x: auto; }
-  h2 { text-transform: uppercase; color: #007bff; border-bottom: 1px solid #333; padding-bottom: 5px; }
+  .serie-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; }
+  h2 { text-transform: uppercase; color: #007bff; margin: 10px 0; }
   table { width: 100%; border-collapse: collapse; margin-top: 15px; }
   th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; white-space: nowrap; }
   th { background: #2a2a2a; }
-  .btn-delete { background: #dc3545; color: #fff; padding: 6px 12px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; }
-  .btn-nav { display: inline-block; background: #007bff; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 0 8px 20px 0; font-weight: bold; border: none; font-size: 16px; cursor: pointer; }
+  .btn-delete { background: #dc3545; color: #fff; padding: 6px 12px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; white-space: nowrap; }
+  .btn-nav { display: inline-block; background: #007bff; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 0 8px 12px 0; font-weight: bold; border: none; font-size: 16px; cursor: pointer; }
   .btn-nav.gris { background: #444; }
+  .btn-nav.rojo { background: #dc3545; }
+  .btn-nav:disabled, .btn-delete:disabled { opacity: .6; cursor: default; }
   .muted { color: #888; }
   a.link { color: #4da3ff; }
 </style>
@@ -23,6 +26,7 @@
 <div class="container">
   <a href="index.html" class="btn-nav">⬅️ Volver al Escáner</a>
   <button class="btn-nav gris" id="refrescar">🔄 Actualizar</button>
+  <button class="btn-nav rojo" id="borrarTodo">🗑️ Borrar todo</button>
   <h1>📋 Registros Guardados</h1>
   <p class="muted">Tras lanzar un análisis, los resultados aparecen aquí cuando el workflow termina (mira el avance en
     <a class="link" id="actionsLink" href="#" target="_blank" rel="noopener">Actions</a>) y pulsas Actualizar.</p>
@@ -35,9 +39,9 @@
   const API = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/data/tiempos_series.json`;
   document.getElementById('actionsLink').href = `https://github.com/${REPO_OWNER}/${REPO_NAME}/actions`;
   document.getElementById('refrescar').addEventListener('click', cargar);
+  document.getElementById('borrarTodo').addEventListener('click', borrarTodo);
 
-  // Pide a la API de GitHub. Si el token es inválido/revocado (401), reintenta sin token:
-  // así la lectura sigue funcionando en un repositorio público.
+  // Lectura: si el token es inválido/revocado (401), reintenta sin token (sirve en repos públicos)
   async function pedir(url, opciones = {}) {
     const token = getToken();
     const headers = { ...(opciones.headers || {}) };
@@ -50,9 +54,10 @@
     return r;
   }
 
-  function fmt(seg) {
+  // 0 = "no detectado", salvo en el inicio de la intro cuando la intro sí se detectó (empieza en 00:00)
+  function fmt(seg, ceroValido = false) {
     seg = parseInt(seg) || 0;
-    if (seg <= 0) return "—";
+    if (seg <= 0 && !ceroValido) return "—";
     const m = String(Math.floor(seg / 60)).padStart(2, '0');
     const s = String(seg % 60).padStart(2, '0');
     return `${m}:${s} (${seg}s)`;
@@ -85,9 +90,18 @@
     for (const serie of series) {
       const bloque = document.createElement('div');
       bloque.className = 'serie-block';
+
+      const cab = document.createElement('div');
+      cab.className = 'serie-head';
       const h = document.createElement('h2');
       h.textContent = "🎬 Serie: " + serie.replace(/_/g, ' ');
-      bloque.appendChild(h);
+      const btnSerie = document.createElement('button');
+      btnSerie.className = 'btn-delete';
+      btnSerie.textContent = "🗑️ Borrar serie";
+      btnSerie.addEventListener('click', () => borrarSerie(serie));
+      cab.appendChild(h);
+      cab.appendChild(btnSerie);
+      bloque.appendChild(cab);
 
       const tabla = document.createElement('table');
       tabla.innerHTML = "<thead><tr><th>Episodio</th><th>Inicio Intro</th><th>Fin Intro</th><th>Inicio Créditos</th><th>Acciones</th></tr></thead>";
@@ -95,7 +109,13 @@
 
       for (const ep of datos[serie]) {
         const tr = document.createElement('tr');
-        const celdas = ["Episodio " + (parseInt(ep.episodio) || 0), fmt(ep.intro_inicio), fmt(ep.intro_fin), fmt(ep.creditos_inicio)];
+        const introDetectada = (parseInt(ep.intro_fin) || 0) > 0;
+        const celdas = [
+          "Episodio " + (parseInt(ep.episodio) || 0),
+          fmt(ep.intro_inicio, introDetectada),
+          fmt(ep.intro_fin),
+          fmt(ep.creditos_inicio)
+        ];
         for (const texto of celdas) {
           const td = document.createElement('td');
           td.textContent = texto;
@@ -105,7 +125,7 @@
         const btn = document.createElement('button');
         btn.className = 'btn-delete';
         btn.textContent = "🗑️ Borrar";
-        btn.addEventListener('click', () => borrar(serie, parseInt(ep.episodio)));
+        btn.addEventListener('click', () => borrarEpisodio(serie, parseInt(ep.episodio)));
         tdAcc.appendChild(btn);
         tr.appendChild(tdAcc);
         tbody.appendChild(tr);
@@ -116,33 +136,63 @@
     }
   }
 
-  async function borrar(serie, ep) {
+  // Lee el JSON actual, aplica la función "cambiar" y lo guarda en el repo (reintenta si hubo un cambio en medio)
+  async function modificar(mensajeCommit, cambiar) {
     const token = getToken();
-    if (!token) { alert("Guarda tu token en la página principal para poder borrar."); return; }
-    if (!confirm("¿Seguro que quieres borrar este episodio?")) return;
-    try {
-      const r = await fetch(`${API}?ref=${BRANCH}&t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
-      });
+    if (!token) { alert("Guarda tu token en la página principal para poder borrar."); return false; }
+    const cab = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' };
+
+    for (let intento = 0; intento < 2; intento++) {
+      const r = await fetch(`${API}?ref=${BRANCH}&t=${Date.now()}`, { cache: 'no-store', headers: cab });
+      if (r.status === 404) { alert("No hay datos que borrar."); return false; }
       if (!r.ok) throw new Error("No se pudo leer el archivo (" + r.status + ")");
       const info = await r.json();
       const datos = JSON.parse(decodeURIComponent(escape(atob(info.content.replace(/\n/g, '')))));
 
-      datos[serie] = (datos[serie] || []).filter(e => parseInt(e.episodio) !== ep);
-      if (!datos[serie].length) delete datos[serie];
+      const nuevos = cambiar(datos);
+      const contenido = btoa(unescape(encodeURIComponent(JSON.stringify(nuevos, null, 2))));
 
-      const nuevo = btoa(unescape(encodeURIComponent(JSON.stringify(datos, null, 2))));
       const put = await fetch(API, {
         method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: `Borrar ${serie} ep ${ep}`, content: nuevo, sha: info.sha, branch: BRANCH })
+        headers: { ...cab, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: mensajeCommit, content: contenido, sha: info.sha, branch: BRANCH })
       });
-      if (!put.ok) throw new Error("No se pudo guardar (" + put.status + "). Para borrar, el token necesita el permiso 'Contents: Read and write'.");
-      cargar();
+      if (put.ok) return true;
+      if (put.status === 409 || put.status === 422) continue;   // alguien cambió el archivo: reintenta
+      if (put.status === 401) throw new Error("El token es inválido o fue revocado. Guarda uno nuevo en la página principal.");
+      if (put.status === 403 || put.status === 404)
+        throw new Error("No se pudo guardar (" + put.status + "). El token necesita el permiso 'Contents: Read and write' sobre este repositorio.");
+      throw new Error("No se pudo guardar (" + put.status + ")");
+    }
+    throw new Error("El archivo cambió mientras se guardaba. Pulsa Actualizar e inténtalo de nuevo.");
+  }
+
+  async function ejecutar(mensaje, confirmacion, cambiar) {
+    if (!confirm(confirmacion)) return;
+    try {
+      if (await modificar(mensaje, cambiar)) cargar();
     } catch (err) {
       alert("Error: " + err.message);
     }
+  }
+
+  function borrarEpisodio(serie, ep) {
+    ejecutar(`Borrar ${serie} ep ${ep}`, "¿Seguro que quieres borrar este episodio?", (datos) => {
+      datos[serie] = (datos[serie] || []).filter(e => parseInt(e.episodio) !== ep);
+      if (!datos[serie].length) delete datos[serie];
+      return datos;
+    });
+  }
+
+  function borrarSerie(serie) {
+    ejecutar(`Borrar serie ${serie}`, `¿Borrar TODOS los episodios de "${serie.replace(/_/g, ' ')}"?`, (datos) => {
+      delete datos[serie];
+      return datos;
+    });
+  }
+
+  function borrarTodo() {
+    ejecutar("Borrar todos los resultados", "¿Borrar TODOS los resultados de TODAS las series? Esta acción no se puede deshacer.", () => ({}));
   }
 
   cargar();
