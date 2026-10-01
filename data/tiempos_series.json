@@ -1,16 +1,1 @@
-{
-  "aguila_roja": [
-    {
-      "episodio": 1,
-      "intro_inicio": 74,
-      "intro_fin": 98,
-      "creditos_inicio": 4762
-    },
-    {
-      "episodio": 2,
-      "intro_inicio": 0,
-      "intro_fin": 34,
-      "creditos_inicio": 4986
-    }
-  ]
-}
+{}
