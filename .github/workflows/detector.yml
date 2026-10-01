@@ -9,6 +9,10 @@ on:
       video_urls:
         description: 'Arreglo JSON de URLs'
         required: true
+      job_id:
+        description: 'Identificador del análisis (opcional, lo usa Nimeon para reconocer su resultado)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -46,6 +50,7 @@ jobs:
       env:
         SERIE_NAME: ${{ github.event.inputs.serie_name }}
         VIDEO_URLS: ${{ github.event.inputs.video_urls }}
+        JOB_ID: ${{ github.event.inputs.job_id }}
       run: |
         python - <<'PY'
         import os, sys, json, subprocess, shutil
@@ -56,6 +61,7 @@ jobs:
         FINAL_SEG = 480
 
         serie = os.environ["SERIE_NAME"]
+        job = os.environ.get("JOB_ID", "")
         urls = json.loads(os.environ["VIDEO_URLS"])
         if len(urls) < 2:
             sys.exit("Se necesitan al menos 2 episodios para comparar.")
@@ -124,8 +130,11 @@ jobs:
                 cred_ini = int(duraciones[nombre] - largo_final + s)
 
             print(f"Ep {i}: intro {intro_ini}-{intro_fin}s, creditos {cred_ini}s (duracion {int(duraciones[nombre])}s)")
-            nuevos.append({"episodio": i, "intro_inicio": intro_ini,
-                           "intro_fin": intro_fin, "creditos_inicio": cred_ini})
+            entrada = {"episodio": i, "intro_inicio": intro_ini,
+                       "intro_fin": intro_fin, "creditos_inicio": cred_ini}
+            if job:
+                entrada["job"] = job
+            nuevos.append(entrada)
 
         ruta_json = os.path.join("data", "tiempos_series.json")
         os.makedirs("data", exist_ok=True)
