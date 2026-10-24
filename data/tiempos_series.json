@@ -1,1 +1,142 @@
-{}
+{
+  "steinsgate_0": [
+    {
+      "episodio": 1,
+      "intro_inicio": 0,
+      "intro_fin": 17,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 2,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 3,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 4,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 5,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 6,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 7,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 8,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 1412
+    },
+    {
+      "episodio": 9,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 10,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 11,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 12,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 13,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 14,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 15,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 16,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 17,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 18,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 19,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 20,
+      "intro_inicio": 18,
+      "intro_fin": 37,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 21,
+      "intro_inicio": 0,
+      "intro_fin": 0,
+      "creditos_inicio": 1417
+    },
+    {
+      "episodio": 22,
+      "intro_inicio": 23,
+      "intro_fin": 47,
+      "creditos_inicio": 0
+    },
+    {
+      "episodio": 23,
+      "intro_inicio": 71,
+      "intro_fin": 93,
+      "creditos_inicio": 0
+    }
+  ]
+}
